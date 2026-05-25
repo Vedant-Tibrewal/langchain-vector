@@ -143,3 +143,4 @@ if __name__ == "__main__":
     result_with_lcel = chain_with_lcel.invoke({"question": query})
     print("\nAnswer:")
     print(result_with_lcel)
+    
