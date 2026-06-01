@@ -12,3 +12,10 @@ dependencies = [
     "langchain-openai>=1.1.12",
     "python-dotenv>=1.2.2",
 ]
+
+[tool.black]
+line-length = 119
+
+[tool.isort]
+profile = "black"
+line_length = 119
