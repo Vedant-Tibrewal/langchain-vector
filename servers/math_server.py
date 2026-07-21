@@ -10,8 +10,8 @@ def add(a: int, b: int) -> int:
 
 
 @mcp.tool()
-def multiple(a: int, b: int) -> int:
-    "multiply two numbers"
+def multiply(a: int, b: int) -> int:
+    "Multiply two numbers"
     return a * b
 
 
