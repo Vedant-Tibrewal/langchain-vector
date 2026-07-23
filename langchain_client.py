@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 from dotenv import load_dotenv
 
@@ -6,51 +7,64 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain_openai import ChatOpenAI
-
-# from langgraph.prebuilt impo
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 
 load_dotenv()
 
 llm = ChatOpenAI(model="gpt-5.5")
 
-stdio_server_params = StdioServerParameters(
-    command="python",
-    args=["servers/math_server.py"],
-)
+
+def build_mcp_connections() -> dict:
+    # Set WEATHER_TRANSPORT to "streamable_http" if weather server runs with transport="streamable-http".
+    # weather_transport = os.getenv("WEATHER_TRANSPORT", "sse")
+    weather_transport = "streamable_http"
+    # weather_transport = "sse"
+
+    connections = {
+        "math": {
+            "transport": "stdio",
+            "command": "python",
+            "args": ["servers/math_server.py"],
+        }
+    }
+
+    if weather_transport == "streamable_http":
+        connections["weather"] = {
+            "transport": "streamable_http",
+            "url": "http://127.0.0.1:8000/mcp",
+        }
+    else:
+        connections["weather"] = {
+            "transport": "sse",
+            "url": "http://127.0.0.1:8000/sse",
+        }
+
+    return connections
 
 
 async def main():
-    async with stdio_client(stdio_server_params) as (read, write):
-        async with ClientSession(read_stream=read, write_stream=write) as session:
-            await session.initialize()
-            print("MCP session initialized.")
-            # tools = await session.list_tools()
-            # agent = create_agent(model=llm, tools=tools)
-            # the above code gives error because of session.list_tools()
-            # returns a list of tool names, but create_agent expects a list of Tool objects.
-            # So we need to load the tools using load_mcp_tools
+    client = MultiServerMCPClient(build_mcp_connections(), tool_name_prefix=True)
 
-            tools = await load_mcp_tools(session)
-            # print(f"Available tools: {tools}")
-            agent = create_agent(
-                model=llm,
-                tools=tools,
-                system_prompt=SystemMessage(
-                    content="You are a math expert. Calculate the results only by using the tools provided. "
-                    "Do not use any other methods or libraries for calculations. If the question is not related "
-                    "to math, respond with 'I can only answer math questions.'"
-                ),
+    tools = await client.get_tools()
+    print(f"Loaded tool count: {len(tools)}")
+    print("Tool names:", [tool.name for tool in tools])
+
+    agent = create_agent(
+        model=llm,
+        tools=tools,
+        system_prompt=SystemMessage(
+            content=(
+                "You are a math and weather assistant. "
+                "Use MCP tools for arithmetic and weather questions. "
+                "If the question is unrelated, say you can only help with math or weather."
             )
+        ),
+    )
 
-            # result = await agent.ainvoke({"messages": [HumanMessage(content="What is 2 + 3?")]})
-            # print(f"Result: {result['messages'][-1].content}")
-
-            result = await agent.ainvoke({"messages": [HumanMessage(content="What is 94 + 3* 2?")]})
-            print(f"Result: {result['messages'][-1].content}")
+    result = await agent.ainvoke(
+        {"messages": [HumanMessage(content="What is 94 + 3 * 2 and what is weather in Bengaluru?")]}
+    )
+    print(f"Result: {result['messages'][-1].content}")
 
 
 if __name__ == "__main__":

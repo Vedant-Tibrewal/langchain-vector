@@ -1,4 +1,4 @@
-from typing import List
+import os
 
 from mcp.server.fastmcp import FastMCP
 
@@ -12,4 +12,11 @@ async def get_weather(location: str) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="sse")
+    transport = "streamable_http"
+    # transport = "sse"
+    if transport == "streamable_http":
+        # localhost:8000/mcp is the endpoint
+        mcp.run(transport="streamable-http")
+    else:
+        # localhost:8000/sse is the endpoint
+        mcp.run(transport="sse")
